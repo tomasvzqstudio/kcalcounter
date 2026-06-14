@@ -216,20 +216,28 @@ function renderModal(){
   foodIn.oninput=e=>{
     state.form.food=e.target.value;
     state.foodSearch=e.target.value;
-    // Clear macros if user is typing a new food
-    render();
+    // Update suggestions in-place WITHOUT re-rendering (avoids focus loss)
+    buildSuggestions(e.target.value);
+    // Update save button
+    const saveBtn=document.querySelector('.btn-save');
+    if(saveBtn){
+      const v=state.form.food.trim()&&parseFloat(state.form.kcal)>0;
+      saveBtn.disabled=!v;saveBtn.style.background=v?'#5b5fef':'#2a2a3a';saveBtn.style.color=v?'#fff':'#444';
+    }
   };
 
-  // Suggestions list
-  let suggestionsEl=null;
-  if(suggestions.length>0){
-    suggestionsEl=document.createElement('div');
-    suggestionsEl.className='food-suggestions';
-    const lbl=document.createElement('div');
-    lbl.className='section-label';
-    lbl.textContent=state.foodSearch.trim()?'Coincidencias':'Usados frecuentemente';
+  // Suggestions container — always in DOM, updated in-place
+  const suggestionsEl=document.createElement('div');
+  suggestionsEl.className='food-suggestions';
+  function buildSuggestions(query){
+    suggestionsEl.innerHTML='';
+    const suggs=getSuggestions(query);
+    if(!suggs.length){suggestionsEl.style.display='none';return;}
+    suggestionsEl.style.display='block';
+    const lbl=document.createElement('div');lbl.className='section-label';
+    lbl.textContent=query.trim()?'Coincidencias':'Usados frecuentemente';
     suggestionsEl.append(lbl);
-    suggestions.forEach(f=>{
+    suggs.forEach(f=>{
       const item=document.createElement('div');item.className='suggestion-item';
       const left=document.createElement('div');
       let meta='';
@@ -240,14 +248,20 @@ function renderModal(){
       const right=document.createElement('div');right.className='suggestion-kcal';right.textContent=`${f.kcal} kcal`;
       item.append(left,right);
       item.onclick=()=>{
-        setState({
-          form:{...state.form,food:f.name,kcal:f.kcal+'',protein:f.protein+'',carbs:f.carbs+'',fat:f.fat+''},
-          foodSearch:f.name
-        });
+        // Fill form in-place, no re-render needed
+        state.form={...state.form,food:f.name,kcal:f.kcal+'',protein:f.protein+'',carbs:f.carbs+'',fat:f.fat+''};
+        state.foodSearch=f.name;
+        foodIn.value=f.name;
+        const keys=['kcal','protein','carbs','fat'];
+        document.querySelectorAll('.num-input').forEach((inp,i)=>{inp.value=state.form[keys[i]];});
+        buildSuggestions(f.name);
+        const saveBtn=document.querySelector('.btn-save');
+        if(saveBtn){saveBtn.disabled=false;saveBtn.style.background='#5b5fef';saveBtn.style.color='#fff';}
       };
       suggestionsEl.append(item);
     });
   }
+  buildSuggestions(state.foodSearch);
 
   // Divider
   const div=document.createElement('div');div.className='divider';
